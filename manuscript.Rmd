@@ -3,11 +3,14 @@ title: "PISA Belonging Scale"
 author: "Alex"
 date: "15/02/2021"
 output: pdf_document
+geometry: margin=1in
+fontsize: 11pt
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE)
 library(data.table)
+library(dplyr)
 library(GAabbreviate)
 library(ggplot2)
 library(reticulate)
@@ -19,24 +22,29 @@ library(reticulate)
 
 import pandas as pd
 from scripts.data_pre_process.extract_pisa_data import read_pisa_data
+from sklearn.model_selection import train_test_split
 
 pisa_belong_data = read_pisa_data()
+
+pisa_train, pisa_test = train_test_split(pisa_belong_data,
+  random_state = 26032021,
+  test_size = .25)
 
 #pisa_belong_data = pd.concat(map(read_pisa_data, ["Australia", "United Kingdom"]))
 
 ```
 
 ```{r pisaR}
-pisa_belong_data <-
-  as.data.table(py$pisa_belong_data)
+pisa_train_data <-
+  as.data.table(py$pisa_train)
 
-pisa_belong_data <-
-  na.omit(pisa_belong_data)
+pisa_train_data <-
+  na.omit(pisa_train_data)
 
-pisa_belong_data[, index := 1:nrow(.SD)]
+pisa_train_data[, index := 1:nrow(.SD)]
 
 pisa_long <-
-  melt(pisa_belong_data,
+  melt(pisa_train_data,
        id.vars = c("index", "country"),
        variable.name = "item",
        value.name = "response")
@@ -53,22 +61,25 @@ ggplot(pisa_long, aes(x = response)) +
 
 ## Factor Analysis
 
-```{r, results=F}
+```{r, results=F, cache=F}
 
-pisa_belong_mat <- psych::reverse.code(
+set.seed(26032021)
+
+pisa_train_mat <- psych::reverse.code(
   keys=c(1,-1,-1,1,-1,1),
-  items=pisa_belong_data[,2:7]
+  items=pisa_train_data[,2:7]
   )
 
-colnames(pisa_belong_mat) <- NULL
+colnames(pisa_train_mat) <- NULL
 
-scales <-
-  apply(pisa_belong_mat, 1, sum)
+scales_train <-
+  apply(pisa_train_mat, 1, sum)
 
-pisa_ga_output <-
+pisa_train_ga_output <-
   GAabbreviate(
-    items = pisa_belong_mat,
-    scales = scales, 
+    items = pisa_train_mat,
+    scales = scales_train, 
+    crossVal = F,
     itemCost = 0.05, 
     maxItems = 1,
     popSize = 200,
@@ -76,9 +87,46 @@ pisa_ga_output <-
     run = 200,
     verbose = F)
 
-plot(pisa_ga_output)
+plot(pisa_train_ga_output)
 
 ```
 
 
+
+```{r, cache=F}
+
+set.seed(27032021)
+
+pisa_test_data <-
+  as.data.table(py$pisa_test)
+
+pisa_test_data <-
+  na.omit(pisa_test_data)
+
+pisa_test_mat <- psych::reverse.code(
+  keys=c(1,-1,-1,1,-1,1),
+  items=pisa_test_data[,2:7]
+  )
+
+colnames(pisa_test_mat) <- NULL
+
+scales_test <-
+  apply(pisa_test_mat, 1, sum)
+
+pisa_test_ga_output <-
+  GAabbreviate(
+    items = pisa_test_mat,
+    scales = scales_test, 
+    crossVal = F,
+    itemCost = 0.05, 
+    maxItems = 1,
+    popSize = 200,
+    maxiter = 500,
+    run = 200,
+    verbose = F)
+
+plot(pisa_test_ga_output)
+
+
+```
 
